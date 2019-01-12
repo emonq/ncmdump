@@ -7,6 +7,7 @@ from os import scandir
 from os.path import basename, join, isfile
 from struct import unpack
 from time import clock
+import os
 
 from Crypto.Cipher import AES
 from mutagen.flac import Picture, FLAC
@@ -117,6 +118,7 @@ def Dump():
                 audio.add_picture(cover)
             audio.save(v2_version=3)
         print('完成')
+        os.remove(file_path)
 
     return _dump
 
