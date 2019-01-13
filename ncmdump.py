@@ -7,14 +7,13 @@ from os import scandir
 from os.path import basename, join, isfile
 from struct import unpack
 from time import clock
-import os
 
 from Crypto.Cipher import AES
 from mutagen.flac import Picture, FLAC
 from mutagen.id3 import APIC
 from mutagen.mp3 import MP3
 from numpy import fromstring
-
+import sys,os
 
 def bxor_numpy(b1, b2):
     n_b1 = fromstring(b1, dtype='uint8')
@@ -82,9 +81,11 @@ def Dump():
             # media data
             music_name = f'{basename(file_path).rsplit(".",maxsplit=1)[0]}.{meta_data["format"]}'
             output_path = join(output_path, music_name)
+            print("文件： ",file_path)
             print(music_name, end=' ··· ')
             if isfile(output_path):
                 print('文件已存在')
+                os.remove(file_path)
                 return
             music_data = f.read()
         l = len(music_data)
@@ -100,23 +101,24 @@ def Dump():
             elif image_data.startswith(b'\x89PNG\r\n\x1a\n'):
                 mime = 'image/png'
             if meta_data['format'] == 'mp3':
-                audio = MP3(output_path)
-                audio.tags.add(
+                mp3 = MP3(output_path)
+                mp3.tags.add(
                     APIC(
                         mime=mime,
                         type=3,
                         data=image_data
                     )
                 )
-
+                mp3.save(v2_version=3)
             elif meta_data['format'] == 'flac':
-                audio = FLAC(output_path)
-                audio.clear_pictures()
-                cover = Picture(image_data)
+                flac = FLAC(output_path)
+                cover = Picture()
+                cover.data=image_data
+                cover.type = 3
                 cover.mime = mime
                 cover.desc = u'cover'
-                audio.add_picture(cover)
-            audio.save(v2_version=3)
+                flac.add_picture(cover)
+                flac.save()
         print('完成')
         os.remove(file_path)
 
@@ -137,10 +139,23 @@ def walk(path):
 def search_and_dump(dir, output_dir):           
     ncm_files = [entry.path for entry in walk(dir) if entry.name.endswith('.ncm')]
     l = len(ncm_files)
+    if l==0:
+        print("没有ncm文件待转换")
+        return
     i = 1
     st = clock()
     for file_path in ncm_files:
-        print(f'{i}/{l}', end=' ')
+        print(f'\n{i}/{l}', end=' ')
         i += 1
         dump(file_path, output_dir)
-    print(f'时间: {clock() - st:.2f}s')
+    print(f'\n时间: {clock() - st:.2f}s')
+
+print('---------------------------------')
+if len(sys.argv)==1:
+    print("工作目录为当前文件夹 "+os.path.split(os.path.realpath(__file__))[0]+'\n')
+    search_and_dump(os.path.split(os.path.realpath(__file__))[0],os.path.split(os.path.realpath(__file__))[0])
+else:
+    for i in range(1,len(sys.argv)):
+        print("工作目录：",sys.argv[i]+'\n')
+        search_and_dump(sys.argv[i],sys.argv[i])
+print('---------------------------------')
